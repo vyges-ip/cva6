@@ -13,3 +13,5 @@ import:
 license:
   spdx: Solderpad-0.51
   file: LICENSE
+
+metadata_locked: true
