@@ -2,7 +2,7 @@ schema_version: "vyges-upstream-v1"
 upstream:
   type: "standalone"
   repo: https://github.com/openhwgroup/cva6
-  commit: 02e11e3b9d9e6a087dc4811b933bf0cc80156e1a
+  commit: 8e694e6460d017fb8a175336cd7dcb91d8eff682
   extracted_at: "2026-04-01T06:13:38Z"
 import:
   rtl:
@@ -13,5 +13,4 @@ import:
 license:
   spdx: Solderpad-0.51
   file: LICENSE
-
 metadata_locked: true
