@@ -92,6 +92,9 @@ module cva6_mmu
     input logic flush_tlb_vvma_i,
     input logic flush_tlb_gvma_i,
 
+    // Shared TLB is busy processing a multi-cycle flush
+    output logic shared_tlb_flush_busy_o,
+
     // Performance counters
     output logic itlb_miss_o,
     output logic dtlb_miss_o,
@@ -274,10 +277,14 @@ module cva6_mmu
       .dtlb_hit_i   (dtlb_lu_hit),
       .dtlb_vaddr_i (lsu_vaddr_i),
 
+      .asid_to_be_flushed_i(asid_to_be_flushed_i),
+      .vaddr_to_be_flushed_i(vaddr_to_be_flushed_i),
+      .vmid_to_be_flushed_i(vmid_to_be_flushed_i),
+      .gpaddr_to_be_flushed_i(gpaddr_to_be_flushed_i),
       // to TLBs, update logic
       .itlb_update_o(update_itlb),
       .dtlb_update_o(update_dtlb),
-
+      .flush_busy_o(shared_tlb_flush_busy_o),
       // Performance counters
       .itlb_miss_o(itlb_miss_o),
       .dtlb_miss_o(dtlb_miss_o),
@@ -360,6 +367,9 @@ module cva6_mmu
   // Instruction Interface
   //-----------------------
   localparam int PPNWMin = (CVA6Cfg.PPNW - 1 > 29) ? 29 : CVA6Cfg.PPNW - 1;
+  // Width of the mid-level (2M) superpage PPN substitution for PtLevels == 3.
+  // Evaluates to 9 for Sv39 and (unused but elaboration-legal) 1 for Sv32.
+  localparam int unsigned MegaPageSubstWidth = PPNWMin - (CVA6Cfg.VpnLen / CVA6Cfg.PtLevels) - 8 - CVA6Cfg.PtLevels;
 
   // The instruction interface is a simple request response interface
   always_comb begin : instr_interface
@@ -561,14 +571,19 @@ module cva6_mmu
         // Strange 9+PtLevels to avoid CI errors on (purely syntactic) checks on Sv32, where
         // `PPNWMin-(CVA6Cfg.VpnLen/CVA6Cfg.PtLevels)` equals `11` and would lead to `lsu_paddr_o[11:12]`
         lsu_paddr_o[PPNWMin-(CVA6Cfg.VpnLen/CVA6Cfg.PtLevels):9+CVA6Cfg.PtLevels] = lsu_vaddr_q[PPNWMin-(CVA6Cfg.VpnLen/CVA6Cfg.PtLevels):9+CVA6Cfg.PtLevels];
-        lsu_dtlb_ppn_o[PPNWMin-(CVA6Cfg.VpnLen/CVA6Cfg.PtLevels):9+CVA6Cfg.PtLevels] = lsu_vaddr_n[PPNWMin-(CVA6Cfg.VpnLen/CVA6Cfg.PtLevels):9+CVA6Cfg.PtLevels];
+      end
+      if (CVA6Cfg.PtLevels == 3 && dtlb_is_page_n[CVA6Cfg.PtLevels-2]) begin
+        lsu_dtlb_ppn_o[0+:MegaPageSubstWidth] = lsu_vaddr_n[(9+CVA6Cfg.PtLevels)+:MegaPageSubstWidth];
       end
 
+
       if (dtlb_is_page_q[0]) begin
-        lsu_dtlb_ppn_o[PPNWMin:12] = lsu_vaddr_n[PPNWMin:12];
         lsu_paddr_o[PPNWMin:12] = lsu_vaddr_q[PPNWMin:12];
       end
 
+      if (dtlb_is_page_n[0]) begin
+        lsu_dtlb_ppn_o[PPNWMin-12:0] = lsu_vaddr_n[PPNWMin:12];
+      end
 
 
       // ---------
