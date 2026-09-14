@@ -46,6 +46,10 @@ cd verif/sim/
 
 errors=0
 
+# Regression for #3535: Zcmp macro expansion must wait for issue acknowledgement.
+make -C ../tb/macro_decoder_unit
+[[ $? > 0 ]] && ((errors++))
+
 # 32-bit configurations without MMU
 riscv_tests_list=(
   rv32ui-p-add
@@ -76,6 +80,20 @@ if [ "$DV_TARGET" = "cv32a60x" ]; then
     --target hwconfig \
     --hwconfig_opts="cv32a60x *RVZCMP=1" \
     --iss=veri-testharness \
+    --linker="../../config/gen_from_riscv_config/cv32a60x/linker/link.ld" \
+    $DV_OPTS
+  [[ $? > 0 ]] && ((errors++))
+fi
+
+# Regression for #3465: reserved Zcmp rlist values must trap as illegal.
+if [ "$DV_TARGET" = "cv32a60x" ]; then
+  python3 cva6.py \
+    --testlist=../tests/testlist_issues.yaml \
+    --test zcmp-reserved-rlist-rv32 \
+    --iss_yaml cva6.yaml \
+    --target hwconfig \
+    --hwconfig_opts="cv32a60x *RVZCMP=1" \
+    --iss=$DV_SIMULATORS \
     --linker="../../config/gen_from_riscv_config/cv32a60x/linker/link.ld" \
     $DV_OPTS
   [[ $? > 0 ]] && ((errors++))
