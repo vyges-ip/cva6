@@ -1550,7 +1550,7 @@ module csr_regfile
         end
         riscv::CSR_HTVAL: begin
           if (CVA6Cfg.RVH) begin
-            htval_d = csr_wdata;
+            htval_d = {{CVA6Cfg.XLEN - CVA6Cfg.GPLEN + 2{1'b0}}, csr_wdata[CVA6Cfg.GPLEN-3:0]};
           end else begin
             update_access_exception = 1'b1;
           end
@@ -1579,10 +1579,11 @@ module csr_regfile
               hgatp[1:0] = 2'b0;
               // only make VMID_LEN - 1 bit stick, that way software can figure out how many VMID bits are supported
               hgatp.vmid = hgatp.vmid & {{(CVA6Cfg.VMIDW - CVA6Cfg.VMID_WIDTH) {1'b0}}, {CVA6Cfg.VMID_WIDTH{1'b1}}};
-              // only update if we actually support this mode
-              if (config_pkg::vm_mode_t'(hgatp.mode) == config_pkg::ModeOff ||
-                            config_pkg::vm_mode_t'(hgatp.mode) == CVA6Cfg.MODE_SV)
-                hgatp_d = hgatp;
+              // Preserve the current mode if the written mode is unsupported.
+              if (config_pkg::vm_mode_t'(hgatp.mode) != config_pkg::ModeOff &&
+                  config_pkg::vm_mode_t'(hgatp.mode) != CVA6Cfg.MODE_SV)
+                hgatp.mode = hgatp_q.mode;
+              hgatp_d = hgatp;
             end
             // changing the mode can have side-effects on address translation (e.g.: other instructions), re-fetch
             // the next instruction by executing a flush
@@ -1765,7 +1766,8 @@ module csr_regfile
         if (CVA6Cfg.RVH) mtinst_d = {{CVA6Cfg.XLEN - 32{1'b0}}, csr_wdata[31:0]};
         else update_access_exception = 1'b1;
         riscv::CSR_MTVAL2:
-        if (CVA6Cfg.RVH) mtval2_d = csr_wdata;
+        if (CVA6Cfg.RVH)
+          mtval2_d = {{CVA6Cfg.XLEN - CVA6Cfg.GPLEN + 2{1'b0}}, csr_wdata[CVA6Cfg.GPLEN-3:0]};
         else update_access_exception = 1'b1;
         riscv::CSR_MIP: begin
           if (CVA6Cfg.RVH) begin
